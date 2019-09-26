@@ -425,9 +425,6 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
                 row = col.row()
                 row.prop(brush, "elastic_deform_volume_preservation", slider=True)
 
-            col.separator()
-            row = col.row()
-            row.prop(brush, "use_automasking_topology")
 
             if brush.sculpt_tool == 'GRAB':
                 col.separator()
@@ -456,7 +453,10 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
             # crease_pinch_factor
             if capabilities.has_pinch_factor:
                 row = col.row(align=True)
-                row.prop(brush, "crease_pinch_factor", slider=True, text="Pinch")
+                if (brush.sculpt_tool in ('BLOB', 'SNAKE_HOOK')):
+                    row.prop(brush, "crease_pinch_factor", slider=True, text="Magnify")
+                else:
+                    row.prop(brush, "crease_pinch_factor", slider=True, text="Pinch")
 
             # rake_factor
             if capabilities.has_rake_factor:
@@ -638,6 +638,7 @@ class VIEW3D_PT_tools_brush_options(Panel, View3DPaintPanel):
             brush_texpaint_common_options(self, context, layout, brush, settings, True)
 
         elif context.sculpt_object and brush:
+            col.prop(brush, "use_automasking_topology")
             if capabilities.has_accumulate:
                 col.prop(brush, "use_accumulate")
 
@@ -646,6 +647,7 @@ class VIEW3D_PT_tools_brush_options(Panel, View3DPaintPanel):
             if capabilities.has_sculpt_plane:
                 col.prop(brush, "sculpt_plane")
                 col.prop(brush, "use_original_normal")
+                col.prop(brush, "use_original_plane")
 
             col.prop(brush, "use_frontface", text="Front Faces Only")
             col.prop(brush, "use_projected")
@@ -1224,15 +1226,6 @@ class VIEW3D_PT_sculpt_voxel_remesh(Panel, View3DPaintPanel):
     def poll(cls, context):
         return (context.sculpt_object and context.tool_settings.sculpt)
 
-    def draw_header(self, context):
-        is_popover = self.is_popover
-        layout = self.layout
-        layout.operator(
-            "object.voxel_remesh",
-            text="",
-            emboss=is_popover,
-        )
-
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
@@ -1241,7 +1234,9 @@ class VIEW3D_PT_sculpt_voxel_remesh(Panel, View3DPaintPanel):
         col = layout.column()
         mesh = context.active_object.data
         col.prop(mesh, "remesh_voxel_size")
+        col.prop(mesh, "remesh_fix_poles")
         col.prop(mesh, "remesh_smooth_normals")
+        col.prop(mesh, "remesh_preserve_volume")
         col.prop(mesh, "remesh_preserve_paint_mask")
         col.operator("object.voxel_remesh", text="Remesh")
 
@@ -1856,7 +1851,7 @@ class VIEW3D_PT_tools_grease_pencil_brush(View3DPanel, Panel):
         brush = gpencil_paint.brush
 
         sub = col.column(align=True)
-        sub.operator("gpencil.brush_presets_create", icon='HELP', text="")
+        sub.operator("gpencil.brush_presets_create", icon='PRESET_NEW', text="")
 
         if brush is not None:
             gp_settings = brush.gpencil_settings
@@ -1884,7 +1879,6 @@ class VIEW3D_PT_tools_grease_pencil_brush_option(View3DPanel, Panel):
     bl_context = ".greasepencil_paint"
     bl_label = "Options"
     bl_category = "Tool"
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -1964,7 +1958,6 @@ class VIEW3D_PT_tools_grease_pencil_brush_settings(View3DPanel, Panel):
     bl_parent_id = 'VIEW3D_PT_tools_grease_pencil_brush_option'
     bl_label = "Post-Processing"
     bl_category = "Tool"
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -2258,12 +2251,12 @@ classes = (
     VIEW3D_PT_tools_brush_display_custom_icon,
     VIEW3D_PT_sculpt_dyntopo,
     VIEW3D_PT_sculpt_dyntopo_remesh,
+    VIEW3D_PT_sculpt_voxel_remesh,
     VIEW3D_PT_sculpt_symmetry,
     VIEW3D_PT_sculpt_symmetry_for_topbar,
     VIEW3D_PT_sculpt_options,
     VIEW3D_PT_sculpt_options_unified,
     VIEW3D_PT_sculpt_options_gravity,
-    VIEW3D_PT_sculpt_voxel_remesh,
     VIEW3D_PT_tools_weightpaint_symmetry,
     VIEW3D_PT_tools_weightpaint_symmetry_for_topbar,
     VIEW3D_PT_tools_weightpaint_options,

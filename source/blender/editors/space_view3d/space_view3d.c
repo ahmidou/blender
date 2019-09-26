@@ -345,6 +345,10 @@ static SpaceLink *view3d_duplicate(SpaceLink *sl)
     v3dn->shading.type = OB_SOLID;
   }
 
+  if (v3dn->shading.prop) {
+    v3dn->shading.prop = IDP_CopyProperty(v3do->shading.prop);
+  }
+
   /* copy or clear inside new stuff */
 
   v3dn->runtime.properties_storage = NULL;
@@ -577,7 +581,7 @@ static void view3d_lightcache_update(bContext *C)
 
   Scene *scene = CTX_data_scene(C);
 
-  if (strcmp(scene->r.engine, RE_engine_id_BLENDER_EEVEE) != 0) {
+  if (!BKE_scene_uses_blender_eevee(scene)) {
     /* Only do auto bake if eevee is the active engine */
     return;
   }
@@ -1038,10 +1042,10 @@ static void view3d_main_region_cursor(wmWindow *win, ScrArea *sa, ARegion *ar)
   ViewLayer *view_layer = WM_window_get_active_view_layer(win);
   Object *obedit = OBEDIT_FROM_VIEW_LAYER(view_layer);
   if (obedit) {
-    WM_cursor_set(win, CURSOR_EDIT);
+    WM_cursor_set(win, WM_CURSOR_EDIT);
   }
   else {
-    WM_cursor_set(win, CURSOR_STD);
+    WM_cursor_set(win, WM_CURSOR_DEFAULT);
   }
 }
 

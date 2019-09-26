@@ -395,6 +395,17 @@ void gpu_extensions_init(void)
       GG.glew_arb_base_instance_is_supported = false;
       GG.context_local_shaders_workaround = true;
     }
+
+    if (strstr(version, "Build 20.19.15.4285")) {
+      /* Somehow fixes armature display issues (see T69743). */
+      GG.context_local_shaders_workaround = true;
+    }
+  }
+  else if ((GG.device == GPU_DEVICE_ATI) && (GG.os == GPU_OS_UNIX) &&
+           (GG.driver == GPU_DRIVER_OPENSOURCE)) {
+    /* See T70187: merging vertices fail. This has been tested from 18.2.2 till 19.3.0~dev of the
+     * Mesa driver */
+    GG.unused_fb_slot_workaround = true;
   }
 
   GPU_invalid_tex_init();

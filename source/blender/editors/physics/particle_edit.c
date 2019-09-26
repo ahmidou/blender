@@ -473,7 +473,8 @@ static void PE_set_view3d_data(bContext *C, PEData *data)
 {
   PE_set_data(C, data);
 
-  ED_view3d_viewcontext_init(C, &data->vc);
+  Depsgraph *depsgraph = CTX_data_ensure_evaluated_depsgraph(C);
+  ED_view3d_viewcontext_init(C, &data->vc, depsgraph);
 
   if (!XRAY_ENABLED(data->vc.v3d)) {
     if (data->vc.v3d->flag & V3D_INVALID_BACKBUF) {
@@ -1624,7 +1625,13 @@ void PE_update_object(Depsgraph *depsgraph, Scene *scene, Object *ob, int usefla
   if (pset->flag & PE_AUTO_VELOCITY) {
     update_velocities(edit);
   }
-  PE_hide_keys_time(scene, edit, CFRA);
+
+  /* Only do this for emitter particles because drawing PE_FADE_TIME is not respected in 2.8 yet
+   * and flagging with PEK_HIDE will prevent selection. This might get restored once this is
+   * supported in drawing (but doesnt make much sense for hair anyways). */
+  if (edit->psys->part->type == PART_EMITTER) {
+    PE_hide_keys_time(scene, edit, CFRA);
+  }
 
   /* regenerate path caches */
   psys_cache_edit_paths(depsgraph, scene, ob, edit, CFRA, G.is_rendering);
@@ -2295,7 +2302,7 @@ int PE_lasso_select(bContext *C, const int mcords[][2], const short moves, const
     }
 
     if (pset->selectmode == SCE_SELECT_POINT) {
-      LOOP_KEYS
+      LOOP_VISIBLE_KEYS
       {
         copy_v3_v3(co, key->co);
         mul_m4_v3(mat, co);
@@ -3315,6 +3322,7 @@ static int delete_exec(bContext *C, wmOperator *op)
   }
 
   DEG_id_tag_update(&data.ob->id, ID_RECALC_GEOMETRY);
+  BKE_particle_batch_cache_dirty_tag(data.edit->psys, BKE_PARTICLE_BATCH_DIRTY_ALL);
   WM_event_add_notifier(C, NC_OBJECT | ND_PARTICLE | NA_EDITED, data.ob);
 
   return OPERATOR_FINISHED;

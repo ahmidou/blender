@@ -32,6 +32,7 @@
 #include "BKE_freestyle.h"
 #include "BKE_idprop.h"
 #include "BKE_layer.h"
+#include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
@@ -91,6 +92,7 @@ static Base *object_base_new(Object *ob)
 {
   Base *base = MEM_callocN(sizeof(Base), "Object Base");
   base->object = ob;
+  base->local_view_bits = ~(0);
   if (ob->base_flag & BASE_SELECTED) {
     base->flag |= BASE_SELECTED;
   }
@@ -652,7 +654,8 @@ static short layer_collection_sync(ViewLayer *view_layer,
                                    ListBase *new_object_bases,
                                    short parent_exclude,
                                    short parent_restrict,
-                                   short parent_layer_restrict)
+                                   short parent_layer_restrict,
+                                   unsigned short parent_local_collections_bits)
 {
   /* TODO: support recovery after removal of intermediate collections, reordering, ..
    * For local edits we can make editing operating do the appropriate thing, but for
@@ -698,6 +701,13 @@ static short layer_collection_sync(ViewLayer *view_layer,
       lc->flag = parent_exclude;
     }
 
+    unsigned short local_collections_bits = parent_local_collections_bits &
+                                            lc->local_collections_bits;
+
+    /* Tag linked collection as a weak reference so we keep the layer
+     * collection pointer on file load and remember exclude state. */
+    id_lib_indirect_weak_link(&collection->id);
+
     /* Collection restrict is inherited. */
     short child_restrict = parent_restrict;
     short child_layer_restrict = parent_layer_restrict;
@@ -713,7 +723,8 @@ static short layer_collection_sync(ViewLayer *view_layer,
                                                      new_object_bases,
                                                      lc->flag,
                                                      child_restrict,
-                                                     child_layer_restrict);
+                                                     child_layer_restrict,
+                                                     local_collections_bits);
 
     /* Layer collection exclude is not inherited. */
     if (lc->flag & LAYER_COLLECTION_EXCLUDE) {
@@ -735,6 +746,10 @@ static short layer_collection_sync(ViewLayer *view_layer,
         continue;
       }
 
+      /* Tag linked object as a weak reference so we keep the object
+       * base pointer on file load and remember hidden state. */
+      id_lib_indirect_weak_link(&cob->ob->id);
+
       void **base_p;
       Base *base;
       if (BLI_ghash_ensure_p(view_layer->object_bases_hash, cob->ob, &base_p)) {
@@ -750,6 +765,7 @@ static short layer_collection_sync(ViewLayer *view_layer,
       else {
         /* Create new base. */
         base = object_base_new(cob->ob);
+        base->local_collections_bits = local_collections_bits;
         *base_p = base;
         BLI_addtail(new_object_bases, base);
       }
@@ -827,7 +843,8 @@ void BKE_layer_collection_sync(const Scene *scene, ViewLayer *view_layer)
                         &new_object_bases,
                         parent_exclude,
                         parent_restrict,
-                        parent_layer_restrict);
+                        parent_layer_restrict,
+                        ~(0));
 
   /* Any remaining object bases are to be removed. */
   for (Base *base = view_layer->object_bases.first; base; base = base->next) {
@@ -1123,7 +1140,9 @@ static void layer_collection_local_sync(ViewLayer *view_layer,
   }
 
   LISTBASE_FOREACH (LayerCollection *, child, &layer_collection->layer_collections) {
-    layer_collection_local_sync(view_layer, child, local_collections_uuid, visible);
+    if ((child->flag & LAYER_COLLECTION_EXCLUDE) == 0) {
+      layer_collection_local_sync(view_layer, child, local_collections_uuid, visible);
+    }
   }
 }
 
